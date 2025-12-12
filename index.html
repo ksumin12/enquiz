@@ -8,7 +8,7 @@
   <style>
     * { box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background:#f7f7fb; }
-    .wrap { max-width: 1020px; margin: 0 auto; padding: 20px; display:grid; gap:16px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);}
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 20px; display:grid; gap:16px; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);}
     .card { background:#fff; border-radius:16px; padding:16px; box-shadow:0 6px 18px rgba(0,0,0,.06); min-width : 0;}
     h1 { font-size: 18px; margin: 0; }
     .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom: 12px; }
@@ -286,14 +286,23 @@ function markWrongWords(words) {
 }
 
 function renderDiff(ops) {
-  const parts = ops.map(op => {
-    if (op.type === "match") return `<span class="token">${op.exp}</span>`;
-    if (op.type === "miss")  return `<span class="token miss" title="빠짐">${op.exp}</span>`;
-    if (op.type === "sub")   return `<span class="token sub" title="다름 (입력: ${op.usr})">${op.exp}</span>`;
-    if (op.type === "extra") return `<span class="token extra" title="추가됨">${op.usr}</span>`;
+  // 오답만: miss(빠짐) + sub(다름) + extra(추가)
+  const wrongs = ops.filter(op => op.type !== "match");
+
+  if (wrongs.length === 0) {
+    diffBox.innerHTML = "";
+    return;
+  }
+
+  const parts = wrongs.map(op => {
+    if (op.type === "miss")  return `<span class="err">빠짐: ${op.exp}</span>`;
+    if (op.type === "sub")   return `<span class="err">다름: ${op.exp} (입력: ${op.usr})</span>`;
+    if (op.type === "extra") return `<span class="err">추가: ${op.usr}</span>`;
   });
+
   diffBox.innerHTML = parts.join(" ");
 }
+
 
 /** ====== 이벤트 ====== */
 document.getElementById("checkBtn").addEventListener("click", () => {
@@ -399,3 +408,4 @@ setOrderForUnit("ALL");
 </script>
 </body>
 </html>
+
