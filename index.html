@@ -1,0 +1,401 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>영작 퀴즈 + 오답 단어 모음</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background:#f7f7fb; }
+    .wrap { max-width: 1020px; margin: 0 auto; padding: 20px; display:grid; gap:16px; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);}
+    .card { background:#fff; border-radius:16px; padding:16px; box-shadow:0 6px 18px rgba(0,0,0,.06); min-width : 0;}
+    h1 { font-size: 18px; margin: 0; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom: 12px; }
+    .controls { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    select { padding:8px 10px; border-radius:12px; border:1px solid #ddd; background:#fff; }
+    .small { font-size:13px; color:#555; }
+    .ko { font-size: 18px; line-height:1.5; padding:12px; background:#f2f3ff; border-radius:12px; min-height: 52px; white-space: pre-wrap; }
+    .hint { color:#666; font-size:13px; margin-top:8px; white-space: pre-wrap; }
+    textarea { width:100%; min-height:90px; padding:12px; border-radius:12px; border:1px solid #ddd; resize: vertical; font-size:16px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    button { border:0; border-radius:12px; padding:10px 14px; background:#2f6fff; color:#fff; font-weight:600; cursor:pointer; }
+    button.secondary { background:#eee; color:#111; }
+    .status { margin-top:10px; padding:10px 12px; border-radius:12px; background:#f6f6f6; }
+    .ok { background:#e9fff0; }
+    .bad { background:#ffecec; }
+    .diff { margin-top:10px; line-height:1.9; }
+    .token { padding:2px 6px; border-radius:10px; }
+    .miss { background:#ffd6d6; }
+    .extra { background:#ffe7b8; }
+    .sub { background:#ffd6ff; }
+    .list { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .pill { background:#111; color:#fff; border-radius:999px; padding:6px 10px; font-size:13px; }
+    .pill span { opacity:.75; margin-left:6px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+    @media (max-width: 900px) {
+      .wrap {grid-template-columns: 1fr;   /* 2열 → 1열 */}
+      .card { padding: 14px; }
+      button { padding: 10px 12px; }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="topbar">
+        <h1>영작 퀴즈</h1>
+        <div class="controls">
+          <label class="small">Unit</label>
+          <select id="unitSelect"></select>
+          <div class="small" id="progress"></div>
+        </div>
+      </div>
+
+      <div class="ko" id="koText"></div>
+      <div class="hint" id="hintBox"></div>
+      <div class="hint">대소문자/문장부호는 무시</div>
+
+      <div style="margin-top:10px;">
+        <textarea id="answer" placeholder="영어 문장 입력"></textarea>
+        <div class="row">
+          <button id="checkBtn">정답 확인</button>
+          <button class="secondary" id="showBtn">정답 보기</button>
+          <button class="secondary" id="prevBtn">이전</button>
+          <button class="secondary" id="nextBtn">다음</button>
+          <button class="secondary" id="shuffleBtn">섞기</button>
+          <button class="secondary" id="resetBtn">오답 단어 초기화</button>
+        </div>
+      </div>
+
+      <div class="status" id="statusBox">문장을 입력하고 “정답 확인”을 누르세요.</div>
+      <div class="diff" id="diffBox"></div>
+      <div class="hint mono" id="answerKey"></div>
+    </div>
+
+    <div class="card">
+      <h1>틀린 단어 모음</h1>
+      <div class="small">사용자가 못 맞힌 “정답 단어”를 누적해요. (브라우저에 저장됨)</div>
+      <div class="list" id="wrongList"></div>
+      <div class="row" style="margin-top:12px;">
+        <button class="secondary" id="exportBtn">CSV로 내보내기</button>
+        <button class="secondary" id="copyBtn">복사</button>
+      </div>
+      <div class="hint">※ Unit을 바꿔도 오답 단어는 누적(전체)됩니다.</div>
+    </div>
+  </div>
+
+<script>
+/** ====== 문제 데이터(Unit별) ====== */
+const items = [
+  // Unit 7
+  { unit:7, id:"U7-1", ko:"딥러닝은 기계가 텍스트, 이미지, 동영상과 같은 방대한 양의 비정형 데이터를 처리할 수 있게 한다.", hint:"(enable machines to)",
+    en:"Deep learning enables machines to process vast amounts of unstructured data such as text, images, and videos." },
+  { unit:7, id:"U7-2", ko:"미디어에서 흔히 묘사하는 것과는 달리 AI는 휴머노이드 로봇을 넘어선 것이다.", hint:"(contrary to popular portrayals)",
+    en:"Contrary to popular portrayals in the media, AI extends beyond humanoid robots." },
+  { unit:7, id:"U7-3", ko:"인공지능은 크게 약한 인공지능과 강한 인공지능의 두 가지 유형으로 분류할 수 있다.", hint:"(be categorized into)",
+    en:"Artificial intelligence can be broadly categorized into two types: weak AI and strong AI." },
+  { unit:7, id:"U7-4", ko:"일반 AI라고도 불리는 강인공지능은 인간과 같은 지능을 보유하는 것을 목표로 한다.", hint:"(aim to)",
+    en:"Strong AI, also referred to as general AI, aims to possess human-like intelligence." },
+  { unit:7, id:"U7-5", ko:"기억력이 약한 AI는 과거 데이터를 통해 학습할 수 있는 능력이 있다.", hint:"(have the ability to)",
+    en:"limited memory AI has the ability to learn from historical data and adapt based on it.",
+    aliases:["Limited memory AI has the ability to learn from historical data and adapt based on it."]},
+
+  // Unit 8
+  { unit:8, id:"U8-1", ko:"기존 컴퓨터와는 달리 양자 컴퓨터는 양자 비트를 사용한다.", hint:"(unlike)",
+    en:"Unlike classical computers, quantum computers use quantum bits." },
+  { unit:8, id:"U8-2", ko:"양자 컴퓨팅의 개념은 1980년대 초에 등장했다.", hint:"(emerge)",
+    en:"The concept of quantum computing emerged in the early 1980s." },
+  { unit:8, id:"U8-3", ko:"양자 컴퓨터는 복잡한 문제를 보다 효율적으로 해결할 수 있는 잠재력을 가지고 있다.", hint:"(have the potential to)",
+    en:"Quantum computers have the potential to solve complex problems more efficiently." },
+  { unit:8, id:"U8-4", ko:"큐비트를 더 많이 추가하면 계산 능력이 기하급수적으로 증가한다.", hint:"(exponentially)",
+    en:"Adding more qubits exponentially increases the computational capacity." },
+  { unit:8, id:"U8-5", ko:"정부와 민간 부문 모두 이 기술에 투자하고 있다.", hint:"(alike)",
+    en:"Governments and private sectors alike are investing in this technology. (recognizing its vast potential.",
+    aliases:[
+      "Governments and private sectors alike are investing in this technology, recognizing its vast potential.",
+      "Governments and private sectors alike are investing in this technology."
+    ]},
+
+  // Unit 9
+  { unit:9, id:"U9-1", ko:"IoT는 임베디드 시스템이 탑재된 웹 지원 스마트 디바이스에 의존한다.", hint:"(rely on)",
+    en:"IoT relies on web-enabled smart devices equipped with embedded systems." },
+  { unit:9, id:"U9-2", ko:"IoT의 주요 장점 중 하나는 언제 어디서나 모든 디바이스에서 정보에 액세스 할 수 있다는 점이다.", hint:"(one of the major advantages)",
+    en:"One of the major advantages of the IoT is the ability to access information from anywhere, at any time, and on any device." },
+  { unit:9, id:"U9-3", ko:"연결된 디바이스의 수가 증가함에 따라 보안은 주요 관심사이다.", hint:"(a major concern)",
+    en:"Security is a major concern as the number of connected devices increases." },
+  { unit:9, id:"U9-4", ko:"이로 인해 디바이스 간 원활한 통신이 어려울 수 있다.", hint:"(make it difficult for)",
+    en:"This can make it difficult for devices to communicate with each other seamlessly, hindering interoperability." },
+  { unit:9, id:"U9-5", ko:"개인 데이터 수집은 개인정보 보호 문제를 야기한다.", hint:"(raise)",
+    en:"The collection of personal data raises privacy concerns." },
+
+  // Unit 11
+  { unit:11, id:"U11-1", ko:"당신은 Amazon.com과 같은 온라인 플랫폼을 통해 3D 프린터를 구매할 수 있다.", hint:"(purchase)",
+    en:"You can also purchase 3D printers and supplies online through platforms such as Amazon.com",
+    aliases:["You can purchase 3D printers and supplies online through platforms such as Amazon.com."]},
+  { unit:11, id:"U11-2", ko:"비록 전통적 정의와는 다르지만, 3D 프린팅은 프린팅의 한 형태로 간주될 수 있다.", hint:"(consider)",
+    en:"3D printing can be considered a form of printing, although it differs from traditional definitions." },
+  { unit:11, id:"U11-3", ko:"DLP 3D 프린팅은 액화 중합체를 굳게 하기 위해 디지털 광 처리 프로젝터를 사용한다.", hint:"(employ, a digital light processing projector, harden, a liquid polymer)",
+    en:"DLP 3D printing employs a digital light processing projector to harden a liquid polymer." },
+  { unit:11, id:"U11-4", ko:"비용 측면에서 볼 때, 3D 프린팅은 매우 작은 원재료로서의 쓰레기를 최소화한다.", hint:"(perspective, minimize, raw material)",
+    en:"From a cost perspective, 3D printing minimizes waste of very little raw material.",
+    aliases:["From a cost perspective, 3D printing minimizes waste of raw material."]},
+  { unit:11, id:"U11-5", ko:"이 기술은 제조를 혁신화 할 잠재성을 갖고 있다.", hint:"(revolutionize, manufacturing)",
+    en:"This technology has the potential to revolutionize manufacturing." },
+
+  // Unit 12
+  { unit:12, id:"U12-1", ko:"드론은 조종사나 컴퓨터에 의해 원격으로 제어되는 로봇 항공기를 말합니다.", hint:"(robotic aircraft, remotely)",
+    en:"Drone are robotic aircraft controlled remotely by a pilot or computer.",
+    aliases:["Drones are robotic aircraft controlled remotely by a pilot or computer."]},
+  { unit:12, id:"U12-2", ko:"모터 선택은 필요한 전력과 원하는 비행 특성 등의 요인에 달려있다.", hint:"(depend on, desired flight characteristics)",
+    en:"The choice of motors depends on factors like required power and desired flight characteristics." },
+  { unit:12, id:"U12-3", ko:"최적의 비행을 위해서는 용량과 무게 사이의 적절한 균형을 찾는 것이 중요하다.", hint:"(capacity and weight, crucial, ensure)",
+    en:"Findinf the right balance between capacity and weight is crucial to ensure optimal flight.",
+    aliases:["Finding the right balance between capacity and weight is crucial to ensure optimal flight."]},
+  { unit:12, id:"U12-4", ko:"안정성과 일관된 성능을 위해 4개의 동일한 ESC를 사용하는 것이 적극 권장된다.", hint:"(stability, consistent performance)",
+    en:"It is highly recommended to use four indentical ESCs for stability and consistent performace.",
+    aliases:["It is highly recommended to use four identical ESCs for stability and consistent performance."]},
+  { unit:12, id:"U12-5", ko:"복잡한 드론 비행을 마스터하려면 이러한 원칙에 대한 연습과 숙지가 필요하다.", hint:"(require, practice, familiarity)",
+    en:"Mastering the intricacies of drone flights requires practice and familiarity with these principles." },
+];
+
+/** ====== 정규화(호환성 좋게: 영어/숫자만 남김) ====== */
+function normalizeToTokens(s) {
+  if (!s) return [];
+  const lowered = String(s).toLowerCase();
+  const cleaned = lowered
+    .replace(/[^a-z0-9\s]+/g, " ")  // 문장부호 제거(영어 기준)
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned ? cleaned.split(" ") : [];
+}
+
+/** ====== LCS diff ====== */
+function diffTokens(expected, user) {
+  const n = expected.length, m = user.length;
+  const dp = Array.from({length:n+1}, () => Array(m+1).fill(0));
+  for (let i=1;i<=n;i++){
+    for (let j=1;j<=m;j++){
+      dp[i][j] = expected[i-1] === user[j-1]
+        ? dp[i-1][j-1] + 1
+        : Math.max(dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  let i=n, j=m;
+  const ops = [];
+  while (i>0 && j>0) {
+    if (expected[i-1] === user[j-1]) { ops.push({type:"match", exp: expected[i-1], usr: user[j-1]}); i--; j--; }
+    else if (dp[i-1][j] >= dp[i][j-1]) { ops.push({type:"miss", exp: expected[i-1]}); i--; }
+    else { ops.push({type:"extra", usr: user[j-1]}); j--; }
+  }
+  while (i>0) { ops.push({type:"miss", exp: expected[i-1]}); i--; }
+  while (j>0) { ops.push({type:"extra", usr: user[j-1]}); j--; }
+  ops.reverse();
+
+  const merged = [];
+  for (let k=0;k<ops.length;k++){
+    const cur = ops[k], nxt = ops[k+1];
+    if (cur?.type==="miss" && nxt?.type==="extra") { merged.push({type:"sub", exp: cur.exp, usr: nxt.usr}); k++; }
+    else merged.push(cur);
+  }
+  const wrongExpectedWords = [];
+  for (const op of merged) if (op.type==="miss" || op.type==="sub") wrongExpectedWords.push(op.exp);
+  return { ops: merged, wrongExpectedWords };
+}
+
+/** ====== 저장 ====== */
+const STORAGE_KEY = "wrong_words_v1";
+function loadWrongMap() {
+  try { return new Map(Object.entries(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"))); }
+  catch { return new Map(); }
+}
+function saveWrongMap(map) {
+  const obj = Object.fromEntries([...map.entries()].map(([k,v]) => [k, Number(v)]));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+}
+
+let wrongMap = loadWrongMap();
+let order = [];
+let idx = 0;
+let currentUnit = "ALL";
+
+/** ====== UI ====== */
+const koText = document.getElementById("koText");
+const hintBox = document.getElementById("hintBox");
+const answer = document.getElementById("answer");
+const statusBox = document.getElementById("statusBox");
+const diffBox = document.getElementById("diffBox");
+const wrongList = document.getElementById("wrongList");
+const progress = document.getElementById("progress");
+const answerKey = document.getElementById("answerKey");
+const unitSelect = document.getElementById("unitSelect");
+
+function renderWrongList() {
+  const entries = [...wrongMap.entries()]
+    .map(([w,c]) => ({w, c:Number(c)}))
+    .sort((a,b)=> b.c-a.c || a.w.localeCompare(b.w));
+  wrongList.innerHTML = "";
+  if (entries.length === 0) { wrongList.innerHTML = `<div class="small">아직 오답 단어가 없어요.</div>`; return; }
+  for (const {w,c} of entries) {
+    const el = document.createElement("div");
+    el.className = "pill";
+    el.textContent = w;
+    const span = document.createElement("span");
+    span.textContent = `x${c}`;
+    el.appendChild(span);
+    wrongList.appendChild(el);
+  }
+}
+
+function setOrderForUnit(unitVal) {
+  currentUnit = unitVal;
+  order = [];
+  items.forEach((it, i) => {
+    if (unitVal === "ALL" || String(it.unit) === String(unitVal)) order.push(i);
+  });
+  idx = 0;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  if (order.length === 0) {
+    koText.textContent = "선택한 Unit에 문제가 없어요.";
+    hintBox.textContent = "";
+    progress.textContent = "0 / 0";
+    return;
+  }
+  const item = items[order[idx]];
+  koText.textContent = item.ko;
+  hintBox.textContent = item.hint ? `${item.hint}` : "";
+  answer.value = "";
+  statusBox.className = "status";
+  statusBox.textContent = "문장을 입력하고 “정답 확인”을 누르세요.";
+  diffBox.innerHTML = "";
+  answerKey.textContent = "";
+  progress.textContent = `${idx+1} / ${order.length} (Unit ${currentUnit === "ALL" ? "ALL" : currentUnit})`;
+}
+
+function markWrongWords(words) {
+  for (const w of words) {
+    if (!w) continue;
+    wrongMap.set(w, (Number(wrongMap.get(w)) || 0) + 1);
+  }
+  saveWrongMap(wrongMap);
+  renderWrongList();
+}
+
+function renderDiff(ops) {
+  const parts = ops.map(op => {
+    if (op.type === "match") return `<span class="token">${op.exp}</span>`;
+    if (op.type === "miss")  return `<span class="token miss" title="빠짐">${op.exp}</span>`;
+    if (op.type === "sub")   return `<span class="token sub" title="다름 (입력: ${op.usr})">${op.exp}</span>`;
+    if (op.type === "extra") return `<span class="token extra" title="추가됨">${op.usr}</span>`;
+  });
+  diffBox.innerHTML = parts.join(" ");
+}
+
+/** ====== 이벤트 ====== */
+document.getElementById("checkBtn").addEventListener("click", () => {
+  if (order.length === 0) return;
+  const item = items[order[idx]];
+  const usr = normalizeToTokens(answer.value);
+
+  const candidates = [item.en, ...(item.aliases || [])];
+  const isCorrect = candidates.some(c => normalizeToTokens(c).join(" ") === usr.join(" "));
+
+  const exp = normalizeToTokens(item.en);
+  const { ops, wrongExpectedWords } = diffTokens(exp, usr);
+
+  if (isCorrect) {
+    statusBox.className = "status ok";
+    statusBox.textContent = "✅ 정답! (대소문자/문장부호 무시 기준)";
+    diffBox.innerHTML = "";
+    answerKey.textContent = "";
+  } else {
+    statusBox.className = "status bad";
+    statusBox.textContent = "❌ 오답. 아래에서 틀린 단어(정답 기준)를 확인하세요.";
+    renderDiff(ops);
+    markWrongWords(wrongExpectedWords);
+  }
+});
+
+document.getElementById("nextBtn").addEventListener("click", () => {
+  if (order.length === 0) return;
+  idx = (idx + 1) % order.length;
+  renderQuestion();
+});
+
+document.getElementById("prevBtn").addEventListener("click", () => {
+  if (order.length === 0) return;
+  idx = (idx - 1 + order.length) % order.length; // 음수 방지
+  renderQuestion();
+});
+
+
+document.getElementById("showBtn").addEventListener("click", () => {
+  if (order.length === 0) return;
+  const item = items[order[idx]];
+  answerKey.textContent = `정답: ${item.en}`;
+});
+
+document.getElementById("shuffleBtn").addEventListener("click", () => {
+  for (let i=order.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  idx = 0;
+  renderQuestion();
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  wrongMap = new Map();
+  localStorage.removeItem(STORAGE_KEY);
+  renderWrongList();
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const rows = [["word","count"], ...[...wrongMap.entries()].map(([w,c])=>[w, c])];
+  const csv = rows.map(r => r.map(x => `"${String(x).replaceAll('"','""')}"`).join(",")).join("\\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "wrong-words.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const text = [...wrongMap.entries()]
+    .sort((a,b)=>Number(b[1])-Number(a[1]))
+    .map(([w,c])=>`${w}\\t${c}`).join("\\n");
+  await navigator.clipboard.writeText(text);
+  alert("복사했어요!");
+});
+
+/** ====== Unit 셀렉트 초기화 ====== */
+function initUnitSelect() {
+  const units = [...new Set(items.map(x => x.unit))].sort((a,b)=>a-b);
+  unitSelect.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value = "ALL";
+  optAll.textContent = "전체(Unit ALL)";
+  unitSelect.appendChild(optAll);
+
+  for (const u of units) {
+    const opt = document.createElement("option");
+    opt.value = String(u);
+    opt.textContent = `Unit ${u}`;
+    unitSelect.appendChild(opt);
+  }
+  unitSelect.value = "ALL";
+  unitSelect.addEventListener("change", (e) => setOrderForUnit(e.target.value));
+}
+
+initUnitSelect();
+renderWrongList();
+setOrderForUnit("ALL");
+</script>
+</body>
+</html>
