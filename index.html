@@ -24,11 +24,15 @@ html = r"""
     .status { margin-top:10px; padding:10px 12px; border-radius:12px; background:#f6f6f6; }
     .ok { background:#e9fff0; }
     .bad { background:#ffecec; }
+    .wrong {
+  background: #ffd6d6;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  padding: 2px 6px;
+}
     .diff { margin-top:10px; line-height:1.9; }
     .token { padding:2px 6px; border-radius:10px; }
-    .miss { background:#ffd6d6; }
     .extra { background:#ffe7b8; }
-    .sub { background:#ffd6ff; }
     .list { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
     .pill { background:#111; color:#fff; border-radius:999px; padding:6px 10px; font-size:13px; }
     .pill span { opacity:.75; margin-left:6px; }
@@ -285,24 +289,35 @@ function markWrongWords(words) {
   renderWrongList();
 }
 
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
 function renderDiff(ops) {
-  // 오답만: miss(빠짐) + sub(다름) + extra(추가)
-  const wrongs = ops.filter(op => op.type !== "match");
+  // 정답(exp) 토큰만 문장처럼 출력
+  // - match: 일반
+  // - miss/sub: 빨간 표시(정답 단어를 못 맞힘)
+  // - extra(사용자 추가 단어): 정답 문장엔 없으니 표시 안 함(원하면 따로 표시 가능)
 
-  if (wrongs.length === 0) {
-    diffBox.innerHTML = "";
-    return;
+  const parts = [];
+  for (const op of ops) {
+    if (op.type === "match") {
+      parts.push(escapeHtml(op.exp));
+    } else if (op.type === "miss" || op.type === "sub") {
+      parts.push(`<span class="wrong">${escapeHtml(op.exp)}</span>`);
+    } else if (op.type === "extra") {
+      // 정답 문장 기준 표시만 원하면 extra는 무시
+    }
   }
-
-  const parts = wrongs.map(op => {
-    if (op.type === "miss")  return `<span class="err">빠짐: ${op.exp}</span>`;
-    if (op.type === "sub")   return `<span class="err">다름: ${op.exp} (입력: ${op.usr})</span>`;
-    if (op.type === "extra") return `<span class="err">추가: ${op.usr}</span>`;
-  });
 
   diffBox.innerHTML = parts.join(" ");
 }
-
 
 /** ====== 이벤트 ====== */
 document.getElementById("checkBtn").addEventListener("click", () => {
