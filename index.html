@@ -68,7 +68,7 @@
           <button class="secondary" id="prevBtn">이전</button>
           <button class="secondary" id="nextBtn">다음</button>
           <button class="secondary" id="shuffleBtn">섞기</button>
-          <button class="secondary" id="resetBtn">오답 단어 초기화</button>
+          <button class="secondary" id="clearBtn">입력/표시 초기화</button>
         </div>
       </div>
 
@@ -79,9 +79,10 @@
 
     <div class="card">
       <h1>틀린 단어 모음</h1>
-      <div class="small">사용자가 못 맞힌 “정답 단어”를 누적해요. (브라우저에 저장됨)</div>
+      <div class="small">사용자가 못 맞힌 “정답 단어”를 누적. (브라우저에 저장됨)</div>
       <div class="list" id="wrongList"></div>
       <div class="row" style="margin-top:12px;">
+        <button class="secondary" id="resetBtn">오답 단어 초기화</button>
         <button class="secondary" id="exportBtn">CSV로 내보내기</button>
         <button class="secondary" id="copyBtn">복사</button>
       </div>
@@ -287,6 +288,23 @@ function markWrongWords(words) {
   saveWrongMap(wrongMap);
   renderWrongList();
 }
+function clearInputAndView() {
+  answer.value = "";
+  statusBox.className = "status";
+  statusBox.textContent = "문장을 입력하고 “정답 확인”을 누르세요.";
+  diffBox.innerHTML = "";
+  answerKey.textContent = "";
+  answer.focus();
+}
+answer.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById("checkBtn").click();
+  }
+});
+document.getElementById("clearBtn").addEventListener("click", () => {
+  clearInputAndView();
+});
 
 function escapeHtml(s) {
   return String(s)
@@ -422,4 +440,5 @@ setOrderForUnit("ALL");
 </script>
 </body>
 </html>
+
 
