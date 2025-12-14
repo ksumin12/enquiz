@@ -263,6 +263,7 @@ let bmMap = loadBmMap();
 let order = [];
 let idx = 0;
 let currentUnit = "ALL";
+let hasCheckedCurrent = false; 
 
 /** ====== UI ====== */
 const koText = document.getElementById("koText");
@@ -306,6 +307,7 @@ function setOrderForUnit(unitVal) {
 }
 
 function renderQuestion() {
+  hasCheckedCurrent = false;
   if (order.length === 0) {
     koText.textContent = "선택한 Unit에 문제가 없어요.";
     hintBox.textContent = "";
@@ -335,6 +337,7 @@ function markWrongWords(words) {
 }
 
 function clearInputAndView() {
+  hasCheckedCurrent = false;
   answer.value = "";
   statusBox.className = "status";
   statusBox.textContent = "문장을 입력하고 “정답 확인”을 누르세요.";
@@ -345,9 +348,16 @@ function clearInputAndView() {
 answer.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
-    document.getElementById("checkBtn").click();
+    if (order.length === 0) return;
+
+    if (hasCheckedCurrent) {
+      document.getElementById("nextBtn").click();  
+    } else {
+      document.getElementById("checkBtn").click(); 
+    }
   }
 });
+
 document.getElementById("clearBtn").addEventListener("click", () => {
   clearInputAndView();
 });
@@ -493,6 +503,7 @@ document.getElementById("bmCopyBtn").addEventListener("click", async () => {
 /** ====== 이벤트(기존) ====== */
 document.getElementById("checkBtn").addEventListener("click", () => {
   if (order.length === 0) return;
+  hasCheckedCurrent = true;
   const item = items[order[idx]];
   const usr = normalizeToTokens(answer.value);
 
@@ -596,3 +607,4 @@ updateBookmarkBtn();
 </script>
 </body>
 </html>
+
